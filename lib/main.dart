@@ -45,6 +45,7 @@ class _HomePageState extends State<HomePage> {
 
   File? _selectedImage;
   Uint8List? _processedBytes;
+  List<Color> _usedPalette = <Color>[];
 
   String selectedPreset = 'レトロ';
   int selectedDotSize = 32;
@@ -123,6 +124,7 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         _selectedImage = File(pickedFile.path);
         _processedBytes = null;
+        _usedPalette = <Color>[];
         _imageWidth = decoded?.width;
         _imageHeight = decoded?.height;
       });
@@ -564,14 +566,22 @@ class _HomePageState extends State<HomePage> {
       result = _applyPreset(result);
 
       final Uint8List pngBytes = Uint8List.fromList(img.encodePng(result));
+      final List<Color> usedPalette = _extractUsedPalette(
+        result,
+        maxColors: _usesCustomColorCount ? selectedColorCount : 16,
+      );
+
+      if (!mounted) {
+        return;
+      }
 
       setState(() {
         _processedBytes = pngBytes;
+        _usedPalette = usedPalette;
         _imageWidth = result.width;
         _imageHeight = result.height;
       });
 
-      if (!mounted) return;
       _showMessage('変換しました');
     } catch (e) {
       if (!mounted) return;
@@ -607,6 +617,32 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
+
+  List<Color> _extractUsedPalette(img.Image image, {int maxColors = 16}) {
+    final Map<int, int> colorCounts = <int, int>{};
+
+    for (int y = 0; y < image.height; y++) {
+      for (int x = 0; x < image.width; x++) {
+        final p = image.getPixel(x, y);
+        final int key =
+            (p.r.toInt() << 16) | (p.g.toInt() << 8) | p.b.toInt();
+        colorCounts[key] = (colorCounts[key] ?? 0) + 1;
+      }
+    }
+
+    final List<MapEntry<int, int>> sorted = colorCounts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return sorted.take(maxColors).map((entry) {
+      final int key = entry.key;
+      return Color.fromARGB(
+        255,
+        (key >> 16) & 0xFF,
+        (key >> 8) & 0xFF,
+        key & 0xFF,
+      );
+    }).toList();
+  }
   Widget _buildImageWidget() {
     if (isProcessing) {
       return const Center(
@@ -699,6 +735,39 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
+
+  Widget _buildPaletteSection() {
+    if (_usedPalette.isEmpty) {
+      return const SizedBox.shrink();
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 20),
+        const Text(
+          '使用された色',
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _usedPalette.map((Color color) {
+            return Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: color,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(color: Colors.black12),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
   String _presetHintText() {
     switch (selectedPreset) {
       case 'モノクロ':
@@ -952,6 +1021,7 @@ class _HomePageState extends State<HomePage> {
                 child: const Text('保存する'),
               ),
             ),
+            _buildPaletteSection(),
           ],
         ),
       ),
@@ -993,6 +1063,13 @@ class PixelGridPainter extends CustomPainter {
     return oldDelegate.columns != columns || oldDelegate.rows != rows;
   }
 }
+
+
+
+
+
+
+
 
 
 
