@@ -480,6 +480,53 @@ class _HomePageState extends State<HomePage> {
     return work;
   }
 
+
+  img.Image _applyEdgeEnhance(img.Image image) {
+    final img.Image source = img.Image.from(image);
+
+    for (int y = 1; y < image.height - 1; y++) {
+      for (int x = 1; x < image.width - 1; x++) {
+        final center = source.getPixel(x, y);
+        final left = source.getPixel(x - 1, y);
+        final right = source.getPixel(x + 1, y);
+        final top = source.getPixel(x, y - 1);
+        final bottom = source.getPixel(x, y + 1);
+
+        int edgeValue(int c, int l, int r, int t, int b) {
+          final int gx = (r - l).abs();
+          final int gy = (b - t).abs();
+          final int edge = ((gx + gy) * 0.35).round().clamp(0, 40);
+          return (c - edge).clamp(0, 255);
+        }
+
+        final int nr = edgeValue(
+          center.r.toInt(),
+          left.r.toInt(),
+          right.r.toInt(),
+          top.r.toInt(),
+          bottom.r.toInt(),
+        );
+        final int ng = edgeValue(
+          center.g.toInt(),
+          left.g.toInt(),
+          right.g.toInt(),
+          top.g.toInt(),
+          bottom.g.toInt(),
+        );
+        final int nb = edgeValue(
+          center.b.toInt(),
+          left.b.toInt(),
+          right.b.toInt(),
+          top.b.toInt(),
+          bottom.b.toInt(),
+        );
+
+        image.setPixelRgba(x, y, nr, ng, nb, center.a.toInt());
+      }
+    }
+
+    return image;
+  }
   img.Image _applyPreset(img.Image image) {
     switch (selectedPreset) {
       case 'モノクロ':
@@ -946,5 +993,7 @@ class PixelGridPainter extends CustomPainter {
     return oldDelegate.columns != columns || oldDelegate.rows != rows;
   }
 }
+
+
 
 
